@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>FastAPI Websocket Chat</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #main {
+            margin-top: 4rem;
+        }
+        #chatbox {
+            overflow-y: scroll;
+            height: 40rem;
+        }
+        .thin-alert {
+            padding: .25rem 1.25rem;
+        }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+        <div id="main" class="row">
+            <div class="col-md-9">
+                <h4>Chat</h4>
+                <div id="chatbox">
+                    <div id="messages"></div>
+                </div>
+                <form>
+                    <div class="form-group row">
+                        <label for="chat-input" class="col-sm-1 col-form-label">Message</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="chat-input" placeholder="Enter message...">
+                        </div>
+                        <div class="col-sm-2">
+                            <button type="submit" class="btn btn-primary" disabled="disabled">Send</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="col-md-3">
+                <h4>Connected Users</h4>
+                <ul id="users"></ul>
+            </div>
+      </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+    /** Add a user to the list of connected users.*/
+    function addToUsersList(userId, isYou) {
+        const newUserLi = $('<li id="users-list-' + userId + '"></li>');
+        newUserLi.append(userId);            
+        if(isYou) {
+            newUserLi.append($('<em> (you)</em>'));
+        }
+        $('#users').append(newUserLi);
+    }
+
+    /** Add a user to the list of connected users and print an alert.*/
+    function addUser(userId) {
+        console.log('Adding user to connected users list:', userId);
+        addToUsersList(userId);
+        addSystemMessage($('<span>User <strong>' + userId + '</strong> joined the room</span>'));
+    }
+
+    /** Remove a user from the list of connected users and print an alert.*/
+    function removeUser(userId) {
+        console.log('Removing user from connected users list:', userId);
+        $('li#users-list-' + userId).remove();
+        addSystemMessage($('<span>User <strong>' + userId + '</strong> left the room</span>'));
+    }
+
+    /** Add a new chat message from a named user. */
+    function addChatMessage(userId, msg) {
+        const newMessage = $('<div class="alert thin-alert" role="alert"></div>');
+        const userSays = $('<strong>' + userId + ':  </strong>');
+        if(userId === myUserId) {
+            newMessage.addClass('alert-secondary');
+        } else {
+            newMessage.addClass('alert-info');
+        }
+        newMessage.append(userSays);
+        newMessage.append(msg);
+        $('#messages').append(newMessage);
+    }
+
+    /** Add a new system message (e.g. user joined/left) to the chat. */
+    function addSystemMessage(msg) {
+        const newMessage = $('<div class="alert thin-alert alert-success" role="alert"></div>');
+        newMessage.append(msg);
+        $('#messages').append(newMessage);
+    }
+    
+    /** Add a new error message to the chat. */
+    function addErrorMessage(msg) {
+        const newMessage = $('<div class="alert thin-alert alert-danger" role="alert"></div>');
+        newMessage.append(msg);
+        $('#messages').append(newMessage);
+    }
+
+    /** Handle an incoming message from the websocket connection. */
+    function onWebsocketMessage(message) {
+        console.log('Got message from websocket:', message);
+        const payload = JSON.parse(message.data);
+        switch(payload.type) {
+            case 'MESSAGE':
+                if(payload.data.user_id === 'server') {
+                    addSystemMessage(payload.data.msg);
+                } else {
+                    addChatMessage(payload.data.user_id, payload.data.msg);
+                }
+                return;
+            case 'USER_JOIN':
+                addUser(payload.data);
+                return;
+            case 'USER_LEAVE':
+                removeUser(payload.data);
+                return;
+            case 'ROOM_JOIN':
+                myUserId = payload.data.user_id;
+                addToUsersList(myUserId, true);
+                return;
+            default:
+                throw new TypeError('Unknown message type: ' + payload.type);
+                return;
+        }
+    }
+
+    
+    function onClickFactory(websocket) {
+        return function (event) {
+            event.preventDefault();
+
+            const $messageInput = $('#chat-input');
+            const message = $messageInput.val();
+            $messageInput.val('');
+            if (!message) {
+                return
+            }
+
+            websocket.send(message);
+        }
+    }
+
+    /** Join up the 'submit' button to the websocket interface. */
+    function onWebsocketOpen(websocket) {
+        return function () {
+            $('button[type="submit"]')
+                .on('click', onClickFactory(websocket))
+                .removeAttr('disabled');
+        }
+    }
+
+    /** Print websocket errors into the chat box using addErrorMessage. */
+    function onWebsocketError(err) {
+        console.error('Websocket error: ', err);
+        addErrorMessage('Error:' + err, 'error');
+        onWebsocketClose();
+    }
+
+    /** Disable the 'submit' button when the websocket connection closes. */
+    function onWebsocketClose() {
+        $('button[type="submit"]')
+            .off('click')
+            .attr('disabled', 'disabled');
+    }
+
+    /** On page load, open a websocket connection, and fetch the list of active users. */ 
+    $(function() { 
+        function reqListener () {
+            const userList = JSON.parse(this.responseText);
+            console.log('Received user list:', userList);
+            userList.forEach(addToUsersList);
+            $(function() {
+                let myUserId = null;
+                websocket = new WebSocket('ws://127.0.0.1:8000/ws');
+                websocket.onopen = onWebsocketOpen(websocket);
+                websocket.onerror = onWebsocketError;
+                websocket.onclose = onWebsocketClose;
+                websocket.onmessage = onWebsocketMessage;
+            });
+        }
+        const oReq = new XMLHttpRequest();
+        oReq.addEventListener("load", reqListener);
+        oReq.open("GET", "http://localhost:8000/list_users");
+        oReq.send();
+    });
+
+    </script>
+  </body>
+</html>
