@@ -133,20 +133,20 @@ async def list_users(request: Request):
     return request.get('room').user_list
 
 
-class Distance(BaseModel):  # pylint: disable=too-few-public-methods
-    """Storm distance indicator.
+class Distance(BaseModel):
+    """Indicator of distance for /thunder endpoint.
     """
-    distance: str = 'extreme'
+    category: str = 'extreme'
 
 
 @app.post('/thunder')
-async def thunder(request: Request, distance: Distance):
+async def thunder(request: Request, distance: Distance=None):
     """Broadcast an ambient message to all chat room users.
     """
     wsp = request.get('room')
-    if distance == 'near':
+    if distance.category == 'near':
         await wsp.broadcast_message('server', 'Thunder booms overhead')
-    elif distance == 'far':
+    elif distance.category == 'far':
         await wsp.broadcast_message('server', 'Thunder rumbles in the distance')
     else:
         await wsp.broadcast_message('server', 'You feel a faint tremor')
