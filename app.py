@@ -1,5 +1,6 @@
 # coding: utf-8
-"""Placeholder app for initial commit.
+"""Demonstration of websocket chat app using FastAPI, Starlette, and an in-memory
+broadcast backend.
 """
 
 from typing import List
