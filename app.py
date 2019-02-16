@@ -115,12 +115,12 @@ class RoomEventMiddleware:
 
     def __call__(self, scope: Scope) -> ASGIInstance:
         if scope['type'] in ('lifespan', 'http', 'websocket'):
-            pass
-        scope['room'] = self._room
+            scope['room'] = self._room
         return self.app(scope)
 
 
 app.add_middleware(RoomEventMiddleware)
+
 
 @app.get('/')
 def home():
