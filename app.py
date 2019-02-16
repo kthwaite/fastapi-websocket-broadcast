@@ -3,6 +3,7 @@
 broadcast backend.
 """
 
+from enum import Enum
 from typing import List
 
 from fastapi import FastAPI
