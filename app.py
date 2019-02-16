@@ -134,20 +134,26 @@ async def list_users(request: Request):
     return request.get('room').user_list
 
 
-class Distance(BaseModel):
+class Distance(str, Enum):
+    Near = 'near'
+    Far = 'far'
+    Extreme = 'extreme'
+
+
+class ThunderDistance(BaseModel):
     """Indicator of distance for /thunder endpoint.
     """
-    category: str = 'extreme'
+    category: Distance = Distance.Extreme
 
 
 @app.post('/thunder')
-async def thunder(request: Request, distance: Distance=None):
+async def thunder(request: Request, distance: ThunderDistance=None):
     """Broadcast an ambient message to all chat room users.
     """
     wsp = request.get('room')
-    if distance.category == 'near':
+    if distance.category == Distance.Near:
         await wsp.broadcast_message('server', 'Thunder booms overhead')
-    elif distance.category == 'far':
+    elif distance == Distance.Far:
         await wsp.broadcast_message('server', 'Thunder rumbles in the distance')
     else:
         await wsp.broadcast_message('server', 'You feel a faint tremor')
