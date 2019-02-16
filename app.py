@@ -36,7 +36,7 @@ class Room:
         return len(self._users)
 
     @property
-    def empty(self):
+    def empty(self) -> bool:
         """Check if the room is empty.
         """
         return len(self._users) == 0
@@ -61,11 +61,37 @@ class Room:
         """Remove a user from the room.
 
         Raises:
-            ValueError: If no such user is stored in the room.
+            ValueError: If the `user_id` is not held within the room.
         """
         if user_id not in self._users:
             raise ValueError(f'User {user_id} is not in the room')
         del self._users[user_id]
+
+    async def whisper(self, from_user: str, to_user: str, msg: str):
+        """Send a private message from one user to another.
+
+        Raises:
+            ValueError: If either `from_user` or `to_user` are not present
+                within the room.
+        """
+        if from_user not in self._users:
+            raise ValueError(f'Calling user {from_user} is not in the room')
+        if to_user not in self._users:
+            await self._users[from_user].send_json({
+                'type': 'ERROR',
+                'data': {
+                    'msg': f'User {user_id} is not in the room!'
+                }
+            })
+            return
+        await self._users[to_user].send_json({
+                'type': 'WHISPER',
+                'data': {
+                    'from_user': from_user,
+                    'to_user': to_user,
+                    'msg': msg,
+                }
+            })
 
     async def broadcast_message(self, user_id: str, msg: str):
         """Broadcast message to all connected users.
