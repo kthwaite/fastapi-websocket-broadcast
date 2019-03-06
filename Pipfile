@@ -4,11 +4,13 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [packages]
-aiofiles = "*"
-fastapi = "*"
-uvicorn = "*"
+aiofiles = "==0.4.0"
+fastapi = "==0.7.1"
+uvicorn = "==0.5.1"
 
 [dev-packages]
+black = "*"
+pylint = "*"
 
 [requires]
 python_version = "3.7"

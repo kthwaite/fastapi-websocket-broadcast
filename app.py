@@ -9,25 +9,24 @@ from typing import List
 from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.endpoints import WebSocketEndpoint
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse
 from starlette.types import ASGIApp, ASGIInstance, Scope
 from starlette.websockets import WebSocket
 
 
-app = FastAPI()     # pylint: disable=invalid-name
+app = FastAPI()  # pylint: disable=invalid-name
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_headers=["*"], allow_methods=["*"]
+)
 app.debug = True
-
-
-@app.on_event('startup')
-async def start_room():
-    global chat_room
-    app.chat_room = Room()
 
 
 class Room:
     """Room state, comprising connected users.
     """
+
     def __init__(self):
         self._users = {}
 
@@ -55,7 +54,7 @@ class Room:
             ValueError: If the `user_id` already exists within the room.
         """
         if user_id in self._users:
-            raise ValueError(f'User {user_id} is already in the room')
+            raise ValueError(f"User {user_id} is already in the room")
         self._users[user_id] = websocket
 
     def remove_user(self, user_id):
@@ -65,7 +64,7 @@ class Room:
             ValueError: If the `user_id` is not held within the room.
         """
         if user_id not in self._users:
-            raise ValueError(f'User {user_id} is not in the room')
+            raise ValueError(f"User {user_id} is not in the room")
         del self._users[user_id]
 
     async def whisper(self, from_user: str, to_user: str, msg: str):
@@ -76,53 +75,41 @@ class Room:
                 within the room.
         """
         if from_user not in self._users:
-            raise ValueError(f'Calling user {from_user} is not in the room')
+            raise ValueError(f"Calling user {from_user} is not in the room")
         if to_user not in self._users:
-            await self._users[from_user].send_json({
-                'type': 'ERROR',
-                'data': {
-                    'msg': f'User {user_id} is not in the room!'
+            await self._users[from_user].send_json(
+                {
+                    "type": "ERROR",
+                    "data": {"msg": f"User {to_user} is not in the room!"},
                 }
-            })
+            )
             return
-        await self._users[to_user].send_json({
-                'type': 'WHISPER',
-                'data': {
-                    'from_user': from_user,
-                    'to_user': to_user,
-                    'msg': msg,
-                }
-            })
+        await self._users[to_user].send_json(
+            {
+                "type": "WHISPER",
+                "data": {"from_user": from_user, "to_user": to_user, "msg": msg},
+            }
+        )
 
     async def broadcast_message(self, user_id: str, msg: str):
         """Broadcast message to all connected users.
         """
         for websocket in self._users.values():
-            await websocket.send_json({
-                'type': 'MESSAGE',
-                'data': {
-                    'user_id': user_id,
-                    'msg': msg,
-                }
-            })
+            await websocket.send_json(
+                {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
+            )
 
     async def broadcast_user_joined(self, user_id: str):
         """Broadcast message to all connected users.
         """
         for websocket in self._users.values():
-            await websocket.send_json({
-                'type': 'USER_JOIN',
-                'data': user_id, 
-            })
+            await websocket.send_json({"type": "USER_JOIN", "data": user_id})
 
     async def broadcast_user_left(self, user_id: str):
         """Broadcast message to all connected users.
         """
         for websocket in self._users.values():
-            await websocket.send_json({
-                'type': 'USER_LEAVE',
-                'data': user_id, 
-            })
+            await websocket.send_json({"type": "USER_LEAVE", "data": user_id})
 
 
 class RoomEventMiddleware:
@@ -136,65 +123,66 @@ class RoomEventMiddleware:
     Postgres LISTEN/NOTIFY, etc) and providing it at the level of an individual
     request.
     """
+
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
         self._room = Room()
 
     def __call__(self, scope: Scope) -> ASGIInstance:
-        if scope['type'] in ('lifespan', 'http', 'websocket'):
-            scope['room'] = self._room
+        if scope["type"] in ("lifespan", "http", "websocket"):
+            scope["room"] = self._room
         return self.app(scope)
 
 
 app.add_middleware(RoomEventMiddleware)
 
 
-@app.get('/')
+@app.get("/")
 def home():
-    return FileResponse('static/index.html')
+    return FileResponse("static/index.html")
 
 
-@app.get('/list_users')
+@app.get("/list_users")
 async def list_users(request: Request):
     """Broadcast an ambient message to all chat room users.
     """
-    return request.get('room').user_list
+    return request.get("room").user_list
 
 
 class Distance(str, Enum):
-    Near = 'near'
-    Far = 'far'
-    Extreme = 'extreme'
+    Near = "near"
+    Far = "far"
+    Extreme = "extreme"
 
 
 class ThunderDistance(BaseModel):
     """Indicator of distance for /thunder endpoint.
     """
+
     category: Distance = Distance.Extreme
 
 
-@app.post('/thunder')
-async def thunder(request: Request, distance: ThunderDistance=None):
+@app.post("/thunder")
+async def thunder(request: Request, distance: ThunderDistance = None):
     """Broadcast an ambient message to all chat room users.
     """
-    wsp = request.get('room')
+    wsp = request.get("room")
     if distance.category == Distance.Near:
-        await wsp.broadcast_message('server', 'Thunder booms overhead')
+        await wsp.broadcast_message("server", "Thunder booms overhead")
     elif distance == Distance.Far:
-        await wsp.broadcast_message('server', 'Thunder rumbles in the distance')
+        await wsp.broadcast_message("server", "Thunder rumbles in the distance")
     else:
-        await wsp.broadcast_message('server', 'You feel a faint tremor')
-    return {
-        'broadcast': distance
-    }
+        await wsp.broadcast_message("server", "You feel a faint tremor")
+    return {"broadcast": distance}
 
 
-@app.websocket_route('/ws', name='ws')
+@app.websocket_route("/ws", name="ws")
 class RoomLive(WebSocketEndpoint):
     """Live connection to the global :class:`~.Room` instance, via WebSocket.
     """
-    encoding = 'text'
-    session_name = ''
+
+    encoding = "text"
+    session_name = ""
     count = 0
 
     def __init__(self, *args, **kwargs):
@@ -207,7 +195,7 @@ class RoomLive(WebSocketEndpoint):
         """Returns monotonically increasing numbered usernames in the form
             'user_[number]'
         """
-        user_id = f'user_{cls.count}'
+        user_id = f"user_{cls.count}"
         cls.count += 1
         return user_id
 
@@ -218,18 +206,15 @@ class RoomLive(WebSocketEndpoint):
         users. The other connected users are notified of the new user's arrival,
         and finally the new user is added to the global :class:`~.Room` instance.
         """
-        room = self.scope.get('room')
+        room = self.scope.get("room")
         if room is None:
-            raise RuntimeError(f'Global `Room` instance unavailable!')
+            raise RuntimeError(f"Global `Room` instance unavailable!")
         self.room = room
         self.user_id = self.get_next_user_id()
         await websocket.accept()
-        await websocket.send_json({
-            'type': 'ROOM_JOIN',
-            'data': {
-                'user_id': self.user_id,
-            }
-        })
+        await websocket.send_json(
+            {"type": "ROOM_JOIN", "data": {"user_id": self.user_id}}
+        )
         await self.room.broadcast_user_joined(self.user_id)
         self.room.add_user(self.user_id, websocket)
 
@@ -243,4 +228,5 @@ class RoomLive(WebSocketEndpoint):
     async def on_receive(self, _websocket: WebSocket, msg: str):
         """Handle incoming message: `msg` is forwarded straight to `broadcast_message`.
         """
-        await  self.room.broadcast_message(self.user_id, msg)
+        await self.room.broadcast_message(self.user_id, msg)
+
