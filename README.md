@@ -2,6 +2,14 @@
 
 An example of the familiar 'chat' websocket demo app, implemented in [FastAPI](https://github.com/tiangolo/fastapi) / [Starlette](https://github.com/encode/starlette).
 
+Run with
+
+```
+uvicorn app:app
+```
+
+And then point your browser to [http://localhost:8000](http://localhost:8000)
+
 ## HTTP Endpoints
 
 ### GET /
