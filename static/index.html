@@ -143,6 +143,7 @@
 
     /** Join up the 'submit' button to the websocket interface. */
     function onWebsocketOpen(websocket) {
+        console.log('Opening WebSocket connection');
         return function () {
             $('button[type="submit"]')
                 .on('click', onClickFactory(websocket))
@@ -159,6 +160,7 @@
 
     /** Disable the 'submit' button when the websocket connection closes. */
     function onWebsocketClose() {
+        console.log('Closing WebSocket connection');
         $('button[type="submit"]')
             .off('click')
             .attr('disabled', 'disabled');
@@ -167,9 +169,9 @@
     /** On page load, open a websocket connection, and fetch the list of active users. */ 
     $(function() { 
         function reqListener () {
-            const userList = JSON.parse(this.responseText);
-            console.log('Received user list:', userList);
-            userList.forEach(addToUsersList);
+            const userData = JSON.parse(this.responseText);
+            console.log('Received user list:', userData);
+            userData.users.forEach(addToUsersList);
             $(function() {
                 let myUserId = null;
                 websocket = new WebSocket('ws://127.0.0.1:8000/ws');
