@@ -12,7 +12,7 @@ from starlette.endpoints import WebSocketEndpoint
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse
-from starlette.types import ASGIApp, ASGIInstance, Scope
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
 
@@ -112,7 +112,7 @@ class Room:
             await websocket.send_json({"type": "USER_LEAVE", "data": user_id})
 
 
-class RoomEventMiddleware:
+class RoomEventMiddleware:  # pylint: disable=too-few-public-methods
     """Middleware for providing a global :class:`~.Room` instance to both HTTP
     and WebSocket scopes.
 
@@ -124,14 +124,14 @@ class RoomEventMiddleware:
     request.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
+    def __init__(self, asgi_app: ASGIApp):
+        self._app = asgi_app
         self._room = Room()
 
-    def __call__(self, scope: Scope) -> ASGIInstance:
+    async def __call__(self, scope: Scope , receive: Receive, send: Send):
         if scope["type"] in ("lifespan", "http", "websocket"):
             scope["room"] = self._room
-        return self.app(scope)
+        await self._app(scope, receive, send)
 
 
 app.add_middleware(RoomEventMiddleware)
