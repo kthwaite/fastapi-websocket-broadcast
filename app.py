@@ -7,13 +7,13 @@ import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel
 from starlette.endpoints import WebSocketEndpoint
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
 
@@ -180,18 +180,11 @@ class ThunderDistance(BaseModel):
     """Indicator of distance for /thunder endpoint.
     """
 
-    category: Distance = Distance.Extreme
+    category: Distance
 
 
-class ThunderResponse(BaseModel):
-    """Response model for /thunder endpoint.
-    """
-
-    broadcast: Distance
-
-
-@app.post("/thunder", response_model=ThunderResponse)
-async def thunder(request: Request, distance: ThunderDistance = None):
+@app.post("/thunder")
+async def thunder(request: Request, distance: ThunderDistance = Body(...)):
     """Broadcast an ambient message to all chat room users.
     """
     room: Optional[Room] = request.get("room")
@@ -199,11 +192,10 @@ async def thunder(request: Request, distance: ThunderDistance = None):
         raise HTTPException(500, detail="Global `Room` instance unavailable!")
     if distance.category == Distance.Near:
         await room.broadcast_message("server", "Thunder booms overhead")
-    elif distance == Distance.Far:
+    elif distance.category == Distance.Far:
         await room.broadcast_message("server", "Thunder rumbles in the distance")
     else:
         await room.broadcast_message("server", "You feel a faint tremor")
-    return {"broadcast": distance}
 
 
 @app.websocket_route("/ws", name="ws")
