@@ -160,7 +160,7 @@ class UserListResponse(BaseModel):
 
 @app.get("/list_users", response_model=UserListResponse)
 async def list_users(request: Request):
-    """Broadcast an ambient message to all chat room users.
+    """List all users connected to the room.
     """
     room: Optional[Room] = request.get("room")
     if room is None:
