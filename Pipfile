@@ -5,8 +5,8 @@ verify_ssl = true
 
 [packages]
 aiofiles = "==0.4.0"
-fastapi = "==0.35.0"
-uvicorn = "==0.8.6"
+fastapi = "==0.42.0"
+uvicorn = "==0.10.3"
 
 [dev-packages]
 black = "*"
@@ -14,3 +14,6 @@ pylint = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true
