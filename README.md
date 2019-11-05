@@ -8,18 +8,8 @@ Run with
 uvicorn app:app
 ```
 
-And then point your browser to [http://localhost:8000](http://localhost:8000)
+And then point your browser to [http://localhost:8000](http://localhost:8000). REST API documentation is available under the `/docs` endpoint.
 
-## HTTP Endpoints
-
-### GET /
-Serves static HTML for chatroom.
-
-### GET /list_users
-Returns a JSON list of user IDs for users connected via websocket.
-
-### POST /thunder
-Broadcasts an ambient message to all users in the chatroom. Message is configurable via the `category` parameter; values should match the `Distance` enum.
 
 ## Websocket interface
 
