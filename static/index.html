@@ -48,11 +48,16 @@
     /** Add a user to the list of connected users.*/
     function addToUsersList(userId, isYou) {
         const newUserLi = $('<li id="users-list-' + userId + '"></li>');
-        newUserLi.append(userId);            
+        newUserLi.append(userId);
         if(isYou) {
             newUserLi.append($('<em> (you)</em>'));
         }
         $('#users').append(newUserLi);
+    }
+
+    /** Clear the users list. */
+    function clearUsersList() {
+        $('#users').empty();
     }
 
     /** Add a user to the list of connected users and print an alert.*/
@@ -89,7 +94,7 @@
         newMessage.append(msg);
         $('#messages').append(newMessage);
     }
-    
+
     /** Add a new error message to the chat. */
     function addErrorMessage(msg) {
         const newMessage = $('<div class="alert thin-alert alert-danger" role="alert"></div>');
@@ -119,13 +124,20 @@
                 myUserId = payload.data.user_id;
                 addToUsersList(myUserId, true);
                 return;
+            case 'ROOM_KICK':
+                addErrorMessage(payload.data.msg);
+                clearUsersList();
+                return;
+            case 'ERROR':
+                addErrorMessage(payload.data.msg);
+                return;
             default:
                 throw new TypeError('Unknown message type: ' + payload.type);
                 return;
         }
     }
 
-    
+
     function onClickFactory(websocket) {
         return function (event) {
             event.preventDefault();
@@ -167,7 +179,7 @@
     }
 
     /** On page load, open a websocket connection, and fetch the list of active users. */ 
-    $(function() { 
+    $(function() {
         function reqListener () {
             const userData = JSON.parse(this.responseText);
             console.log('Received user list:', userData);
@@ -183,7 +195,7 @@
         }
         const oReq = new XMLHttpRequest();
         oReq.addEventListener("load", reqListener);
-        oReq.open("GET", "http://localhost:8000/list_users");
+        oReq.open("GET", "http://localhost:8000/users");
         oReq.send();
     });
 

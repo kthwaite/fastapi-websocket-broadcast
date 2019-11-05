@@ -4,6 +4,7 @@ broadcast backend.
 """
 
 import logging
+import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,15 @@ app.debug = True
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
+class UserInfo(BaseModel):
+    """Chatroom user metadata.
+    """
+
+    user_id: str
+    connected_at: float
+    message_count: int
+
+
 class Room:
     """Room state, comprising connected users.
     """
@@ -33,6 +43,7 @@ class Room:
     def __init__(self):
         log.info("Creating new empty room")
         self._users: Dict[str, WebSocket] = {}
+        self._user_meta: Dict[str, UserInfo] = {}
 
     def __len__(self) -> int:
         """Get the number of users in the room.
@@ -61,6 +72,29 @@ class Room:
             raise ValueError(f"User {user_id} is already in the room")
         log.info("Adding user %s to room", user_id)
         self._users[user_id] = websocket
+        self._user_meta[user_id] = UserInfo(
+            user_id=user_id, connected_at=time.time(), message_count=0
+        )
+
+    async def kick_user(self, user_id: str):
+        """Forcibly disconnect a user from the room.
+
+        We do not need to call `remove_user`, as this will be invoked automatically
+        when the websocket connection is closed by the `RoomLive.on_disconnect` method.
+
+        Raises:
+            ValueError: If the `user_id` is not held within the room.
+        """
+        if user_id not in self._users:
+            raise ValueError(f"User {user_id} is not in the room")
+        await self._users[user_id].send_json(
+            {
+                "type": "ROOM_KICK",
+                "data": {"msg": "You have been kicked from the chatroom!"},
+            }
+        )
+        log.info("Kicking user %s from room", user_id)
+        await self._users[user_id].close()
 
     def remove_user(self, user_id: str):
         """Remove a user from the room.
@@ -72,6 +106,12 @@ class Room:
             raise ValueError(f"User {user_id} is not in the room")
         log.info("Removing user %s from room", user_id)
         del self._users[user_id]
+        del self._user_meta[user_id]
+
+    def get_user(self, user_id: str) -> Optional[UserInfo]:
+        """Get metadata on a user.
+        """
+        return self._user_meta.get(user_id)
 
     async def whisper(self, from_user: str, to_user: str, msg: str):
         """Send a private message from one user to another.
@@ -101,6 +141,7 @@ class Room:
     async def broadcast_message(self, user_id: str, msg: str):
         """Broadcast message to all connected users.
         """
+        self._user_meta[user_id].message_count += 1
         for websocket in self._users.values():
             await websocket.send_json(
                 {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
@@ -135,7 +176,7 @@ class RoomEventMiddleware:  # pylint: disable=too-few-public-methods
         self._app = asgi_app
         self._room = Room()
 
-    async def __call__(self, scope: Scope , receive: Receive, send: Send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
         if scope["type"] in ("lifespan", "http", "websocket"):
             scope["room"] = self._room
         await self._app(scope, receive, send)
@@ -158,7 +199,7 @@ class UserListResponse(BaseModel):
     users: List[str]
 
 
-@app.get("/list_users", response_model=UserListResponse)
+@app.get("/users", response_model=UserListResponse)
 async def list_users(request: Request):
     """List all users connected to the room.
     """
@@ -168,9 +209,39 @@ async def list_users(request: Request):
     return {"users": room.user_list}
 
 
+class UserInfoResponse(UserInfo):
+    """Response model for /users/:user_id endpoint.
+    """
+
+
+@app.get("/users/{user_id}", response_model=UserInfoResponse)
+async def get_user_info(request: Request, user_id: str):
+    room: Optional[Room] = request.get("room")
+    if room is None:
+        raise HTTPException(500, detail="Global `Room` instance unavailable!")
+    user = room.get_user(user_id)
+    if user is None:
+        raise HTTPException(404, detail=f"No such user: {user_id}")
+    return user
+
+
+@app.post("/users/{user_id}/kick", response_model=UserListResponse)
+async def kick_user(request: Request, user_id: str):
+    """List all users connected to the room.
+    """
+    room: Optional[Room] = request.get("room")
+    if room is None:
+        raise HTTPException(500, detail="Global `Room` instance unavailable!")
+    try:
+        await room.kick_user(user_id)
+    except ValueError:
+        raise HTTPException(404, detail=f"No such user: {user_id}")
+
+
 class Distance(str, Enum):
     """Distance classes for the /thunder endpoint.
     """
+
     Near = "near"
     Far = "far"
     Extreme = "extreme"
