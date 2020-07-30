@@ -172,8 +172,8 @@ class RoomEventMiddleware:  # pylint: disable=too-few-public-methods
     request.
     """
 
-    def __init__(self, asgi_app: ASGIApp):
-        self._app = asgi_app
+    def __init__(self, app: ASGIApp):
+        self._app = app
         self._room = Room()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send):
