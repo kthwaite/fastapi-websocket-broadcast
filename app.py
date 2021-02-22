@@ -141,7 +141,7 @@ class Room:
     async def broadcast_message(self, user_id: str, msg: str):
         """Broadcast message to all connected users.
         """
-        self._user_meta[user_id].message_count += 1
+        # self._user_meta[user_id].message_count += 1 # TODO: review, in the /thunder endpoint you are passing 'server' as user_id, which will never exists.
         for websocket in self._users.values():
             await websocket.send_json(
                 {"type": "MESSAGE", "data": {"user_id": user_id, "msg": msg}}
