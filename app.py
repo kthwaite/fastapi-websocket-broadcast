@@ -1,4 +1,3 @@
-# coding: utf-8
 """Demonstration of websocket chat app using FastAPI, Starlette, and an in-memory
 broadcast backend.
 """
@@ -18,18 +17,20 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
 
-app = FastAPI()  # pylint: disable=invalid-name
+app = FastAPI()
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_headers=["*"], allow_methods=["*"]
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_headers=["*"],
+    allow_methods=["*"],
 )
 app.debug = True
 
-log = logging.getLogger(__name__)  # pylint: disable=invalid-name
+log = logging.getLogger(__name__)
 
 
 class UserInfo(BaseModel):
-    """Chatroom user metadata.
-    """
+    """Chatroom user metadata."""
 
     user_id: str
     connected_at: float
@@ -37,8 +38,7 @@ class UserInfo(BaseModel):
 
 
 class Room:
-    """Room state, comprising connected users.
-    """
+    """Room state, comprising connected users."""
 
     def __init__(self):
         log.info("Creating new empty room")
@@ -46,20 +46,17 @@ class Room:
         self._user_meta: Dict[str, UserInfo] = {}
 
     def __len__(self) -> int:
-        """Get the number of users in the room.
-        """
+        """Get the number of users in the room."""
         return len(self._users)
 
     @property
     def empty(self) -> bool:
-        """Check if the room is empty.
-        """
+        """Check if the room is empty."""
         return len(self._users) == 0
 
     @property
     def user_list(self) -> List[str]:
-        """Return a list of IDs for connected users.
-        """
+        """Return a list of IDs for connected users."""
         return list(self._users)
 
     def add_user(self, user_id: str, websocket: WebSocket):
@@ -109,8 +106,7 @@ class Room:
         del self._user_meta[user_id]
 
     def get_user(self, user_id: str) -> Optional[UserInfo]:
-        """Get metadata on a user.
-        """
+        """Get metadata on a user."""
         return self._user_meta.get(user_id)
 
     async def whisper(self, from_user: str, to_user: str, msg: str):
@@ -139,8 +135,7 @@ class Room:
         )
 
     async def broadcast_message(self, user_id: str, msg: str):
-        """Broadcast message to all connected users.
-        """
+        """Broadcast message to all connected users."""
         self._user_meta[user_id].message_count += 1
         for websocket in self._users.values():
             await websocket.send_json(
@@ -148,14 +143,12 @@ class Room:
             )
 
     async def broadcast_user_joined(self, user_id: str):
-        """Broadcast message to all connected users.
-        """
+        """Broadcast message to all connected users."""
         for websocket in self._users.values():
             await websocket.send_json({"type": "USER_JOIN", "data": user_id})
 
     async def broadcast_user_left(self, user_id: str):
-        """Broadcast message to all connected users.
-        """
+        """Broadcast message to all connected users."""
         for websocket in self._users.values():
             await websocket.send_json({"type": "USER_LEAVE", "data": user_id})
 
@@ -187,22 +180,19 @@ app.add_middleware(RoomEventMiddleware)
 
 @app.get("/")
 def home():
-    """Serve static index page.
-    """
+    """Serve static index page."""
     return FileResponse("static/index.html")
 
 
 class UserListResponse(BaseModel):
-    """Response model for /list_users endpoint.
-    """
+    """Response model for /list_users endpoint."""
 
     users: List[str]
 
 
 @app.get("/users", response_model=UserListResponse)
 async def list_users(request: Request):
-    """List all users connected to the room.
-    """
+    """List all users connected to the room."""
     room: Optional[Room] = request.get("room")
     if room is None:
         raise HTTPException(500, detail="Global `Room` instance unavailable!")
@@ -210,8 +200,7 @@ async def list_users(request: Request):
 
 
 class UserInfoResponse(UserInfo):
-    """Response model for /users/:user_id endpoint.
-    """
+    """Response model for /users/:user_id endpoint."""
 
 
 @app.get("/users/{user_id}", response_model=UserInfoResponse)
@@ -227,8 +216,7 @@ async def get_user_info(request: Request, user_id: str):
 
 @app.post("/users/{user_id}/kick", response_model=UserListResponse)
 async def kick_user(request: Request, user_id: str):
-    """List all users connected to the room.
-    """
+    """List all users connected to the room."""
     room: Optional[Room] = request.get("room")
     if room is None:
         raise HTTPException(500, detail="Global `Room` instance unavailable!")
@@ -239,8 +227,7 @@ async def kick_user(request: Request, user_id: str):
 
 
 class Distance(str, Enum):
-    """Distance classes for the /thunder endpoint.
-    """
+    """Distance classes for the /thunder endpoint."""
 
     Near = "near"
     Far = "far"
@@ -248,16 +235,14 @@ class Distance(str, Enum):
 
 
 class ThunderDistance(BaseModel):
-    """Indicator of distance for /thunder endpoint.
-    """
+    """Indicator of distance for /thunder endpoint."""
 
     category: Distance
 
 
 @app.post("/thunder")
 async def thunder(request: Request, distance: ThunderDistance = Body(...)):
-    """Broadcast an ambient message to all chat room users.
-    """
+    """Broadcast an ambient message to all chat room users."""
     room: Optional[Room] = request.get("room")
     if room is None:
         raise HTTPException(500, detail="Global `Room` instance unavailable!")
@@ -271,8 +256,7 @@ async def thunder(request: Request, distance: ThunderDistance = Body(...)):
 
 @app.websocket_route("/ws", name="ws")
 class RoomLive(WebSocketEndpoint):
-    """Live connection to the global :class:`~.Room` instance, via WebSocket.
-    """
+    """Live connection to the global :class:`~.Room` instance, via WebSocket."""
 
     encoding: str = "text"
     session_name: str = ""
@@ -286,7 +270,7 @@ class RoomLive(WebSocketEndpoint):
     @classmethod
     def get_next_user_id(cls):
         """Returns monotonically increasing numbered usernames in the form
-            'user_[number]'
+        'user_[number]'
         """
         user_id: str = f"user_{cls.count}"
         cls.count += 1
@@ -302,7 +286,7 @@ class RoomLive(WebSocketEndpoint):
         log.info("Connecting new user...")
         room: Optional[Room] = self.scope.get("room")
         if room is None:
-            raise RuntimeError(f"Global `Room` instance unavailable!")
+            raise RuntimeError("Global `Room` instance unavailable!")
         self.room = room
         self.user_id = self.get_next_user_id()
         await websocket.accept()
@@ -324,8 +308,7 @@ class RoomLive(WebSocketEndpoint):
         await self.room.broadcast_user_left(self.user_id)
 
     async def on_receive(self, _websocket: WebSocket, msg: Any):
-        """Handle incoming message: `msg` is forwarded straight to `broadcast_message`.
-        """
+        """Handle incoming message: `msg` is forwarded straight to `broadcast_message`."""
         if self.user_id is None:
             raise RuntimeError("RoomLive.on_receive() called without a valid user_id")
         if not isinstance(msg, str):
