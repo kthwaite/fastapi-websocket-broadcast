@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fastapi-websocket-broadcast"
+version = "0.0.0"
+description = "FastAPI websocket demo"
+authors = ["Kit Thwaite <28732700+kthwaite@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+aiofiles = "^24.1.0"
+fastapi = "^0.112.1"
+uvicorn = {extras = ["standard"], version = "^0.30.6"}
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
